@@ -1,0 +1,321 @@
+[
+  {
+    "id": "G001",
+    "user_text": "努力一定会成功。",
+    "gold": {
+      "claim": "努力一定会成功",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "counterexample",
+      "expected_stage": "S4",
+      "expected_intent": "counterexample",
+      "reference_question": "如果有人长期努力却没有成功，这会推翻你的结论吗？你想加什么条件？"
+    }
+  },
+  {
+    "id": "G002",
+    "user_text": "有钱就会幸福。",
+    "gold": {
+      "claim": "有钱就会幸福",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "definition",
+      "expected_stage": "S1",
+      "expected_intent": "clarify_term",
+      "reference_question": "你这里的“幸福”具体指什么状态？"
+    }
+  },
+  {
+    "id": "G003",
+    "user_text": "学校应该禁止学生带手机，因为手机会影响学习。",
+    "gold": {
+      "claim": "学校应该禁止学生带手机",
+      "reasons": [
+        "手机会影响学习"
+      ],
+      "definitions": [],
+      "value_premises": [
+        "学习效率应优先于手机使用自由"
+      ],
+      "weak_point": "logic_link",
+      "expected_stage": "S3",
+      "expected_intent": "necessary_vs_sufficient",
+      "reference_question": "“影响学习”这个条件是足以支持“全面禁止”吗，还是只支持“部分限制”？"
+    }
+  },
+  {
+    "id": "G004",
+    "user_text": "我认为朋友就该无条件帮忙，不帮就不算朋友。",
+    "gold": {
+      "claim": "朋友应无条件帮忙，不帮就不算朋友",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [
+        "朋友关系以互助义务为核心"
+      ],
+      "weak_point": "definition",
+      "expected_stage": "S1",
+      "expected_intent": "clarify_term",
+      "reference_question": "你说的“朋友”标准是什么？“无条件”包含哪些边界？"
+    }
+  },
+  {
+    "id": "G005",
+    "user_text": "我之前觉得分数不重要，但现在又觉得分数决定未来。",
+    "gold": {
+      "claim": "分数决定未来",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "consistency",
+      "expected_stage": "S3",
+      "expected_intent": "test_consistency",
+      "reference_question": "你前后两种说法如何同时成立？是情境变了，还是标准变了？"
+    }
+  },
+  {
+    "id": "G006",
+    "user_text": "我最近很迷茫，不知道怎么办。",
+    "gold": {
+      "claim": null,
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "claim",
+      "expected_stage": "S0",
+      "expected_intent": "clarify_term",
+      "reference_question": "如果只说一个核心问题，你最想解决的是什么？"
+    }
+  },
+  {
+    "id": "G007",
+    "user_text": "自由最重要。",
+    "gold": {
+      "claim": "自由最重要",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [
+        "自由应高于其他价值"
+      ],
+      "weak_point": "definition",
+      "expected_stage": "S1",
+      "expected_intent": "clarify_term",
+      "reference_question": "你说的“自由”具体是选择自由、表达自由，还是别的自由？"
+    }
+  },
+  {
+    "id": "G008",
+    "user_text": "我觉得早起好，因为早起能多出两个小时学习。",
+    "gold": {
+      "claim": "早起好",
+      "reasons": [
+        "早起能多出两个小时学习"
+      ],
+      "definitions": [],
+      "value_premises": [
+        "学习时间越多越好"
+      ],
+      "weak_point": "causality",
+      "expected_stage": "S3",
+      "expected_intent": "probe_causality",
+      "reference_question": "你怎么确定“早起”本身导致效率提升，而不是只是把时间挪到了别处？"
+    }
+  },
+  {
+    "id": "G009",
+    "user_text": "所有网课都不如线下课。",
+    "gold": {
+      "claim": "所有网课都不如线下课",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "counterexample",
+      "expected_stage": "S4",
+      "expected_intent": "counterexample",
+      "reference_question": "如果有高质量网课效果更好，这个例子会让你修正“所有”这个词吗？"
+    }
+  },
+  {
+    "id": "G010",
+    "user_text": "只要自律，就一定能考上理想大学。",
+    "gold": {
+      "claim": "只要自律，就一定能考上理想大学",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "logic_link",
+      "expected_stage": "S3",
+      "expected_intent": "necessary_vs_sufficient",
+      "reference_question": "你说“自律”是必要条件，还是充分条件？为什么？"
+    }
+  },
+  {
+    "id": "G011",
+    "user_text": "我支持校服，因为这样更公平。",
+    "gold": {
+      "claim": "我支持校服",
+      "reasons": [
+        "这样更公平"
+      ],
+      "definitions": [],
+      "value_premises": [
+        "公平优先于个性表达"
+      ],
+      "weak_point": "definition",
+      "expected_stage": "S1",
+      "expected_intent": "clarify_term",
+      "reference_question": "你这里的“公平”是经济负担更公平，还是社交比较更公平？"
+    }
+  },
+  {
+    "id": "G012",
+    "user_text": "既然很多成功人士都辍学了，那读书没意义。",
+    "gold": {
+      "claim": "读书没意义",
+      "reasons": [
+        "很多成功人士都辍学"
+      ],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "logic_link",
+      "expected_stage": "S3",
+      "expected_intent": "necessary_vs_sufficient",
+      "reference_question": "“有些人辍学成功”能推出“读书没意义”吗？这中间缺了什么前提？"
+    }
+  },
+  {
+    "id": "G013",
+    "user_text": "我相信AI会取代所有老师。",
+    "gold": {
+      "claim": "AI会取代所有老师",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "counterexample",
+      "expected_stage": "S4",
+      "expected_intent": "counterexample",
+      "reference_question": "如果有教学情境必须依赖真人互动，你的“所有老师”结论还成立吗？"
+    }
+  },
+  {
+    "id": "G014",
+    "user_text": "我应该选稳定工作，因为家里需要我尽快挣钱。",
+    "gold": {
+      "claim": "我应该选稳定工作",
+      "reasons": [
+        "家里需要我尽快挣钱"
+      ],
+      "definitions": [],
+      "value_premises": [
+        "家庭责任优先于个人兴趣"
+      ],
+      "weak_point": "actionability",
+      "expected_stage": "S5",
+      "expected_intent": "operationalize",
+      "reference_question": "在这个价值排序下，你接下来一周的第一步行动是什么？"
+    }
+  },
+  {
+    "id": "G015",
+    "user_text": "我不想卷，但我又希望在竞争里赢。",
+    "gold": {
+      "claim": "我希望在竞争里赢",
+      "reasons": [],
+      "definitions": [
+        {
+          "term": "卷",
+          "definition": ""
+        }
+      ],
+      "value_premises": [],
+      "weak_point": "consistency",
+      "expected_stage": "S3",
+      "expected_intent": "test_consistency",
+      "reference_question": "你如何同时满足“不卷”和“想赢”？你愿意放弃哪一部分目标？"
+    }
+  },
+  {
+    "id": "G016",
+    "user_text": "我觉得健康很重要。",
+    "gold": {
+      "claim": "健康很重要",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [
+        "健康应优先"
+      ],
+      "weak_point": "premise",
+      "expected_stage": "S2",
+      "expected_intent": "ask_premise",
+      "reference_question": "如果要说服一个不同意你的人，你会给出哪条最关键依据？"
+    }
+  },
+  {
+    "id": "G017",
+    "user_text": "我认为恋爱会影响学习，所以高中不该谈恋爱。",
+    "gold": {
+      "claim": "高中不该谈恋爱",
+      "reasons": [
+        "恋爱会影响学习"
+      ],
+      "definitions": [],
+      "value_premises": [
+        "学习成绩优先于恋爱体验"
+      ],
+      "weak_point": "causality",
+      "expected_stage": "S3",
+      "expected_intent": "probe_causality",
+      "reference_question": "你如何区分“恋爱导致成绩下降”和“本来状态差的人更容易分心”？"
+    }
+  },
+  {
+    "id": "G018",
+    "user_text": "如果一个规则能提高效率，那它就是好规则。",
+    "gold": {
+      "claim": "提高效率的规则就是好规则",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [
+        "效率是评价规则好坏的首要标准"
+      ],
+      "weak_point": "value",
+      "expected_stage": "S3",
+      "expected_intent": "value_priority",
+      "reference_question": "当效率和公平冲突时，你为什么一定优先效率？"
+    }
+  },
+  {
+    "id": "G019",
+    "user_text": "我支持熬夜学习，因为这周确实提高了分数。",
+    "gold": {
+      "claim": "我支持熬夜学习",
+      "reasons": [
+        "这周确实提高了分数"
+      ],
+      "definitions": [],
+      "value_premises": [],
+      "weak_point": "counterexample",
+      "expected_stage": "S4",
+      "expected_intent": "counterexample",
+      "reference_question": "如果长期熬夜导致效率下降，你会如何修订这个结论？"
+    }
+  },
+  {
+    "id": "G020",
+    "user_text": "我现在的观点是：先保证睡眠，再谈成绩；今晚开始11点前睡。",
+    "gold": {
+      "claim": "先保证睡眠，再谈成绩",
+      "reasons": [],
+      "definitions": [],
+      "value_premises": [
+        "长期状态优先于短期分数"
+      ],
+      "weak_point": "actionability",
+      "expected_stage": "S5",
+      "expected_intent": "operationalize",
+      "reference_question": "你如何在未来一周验证这个行动承诺真的执行了？"
+    }
+  }
+]

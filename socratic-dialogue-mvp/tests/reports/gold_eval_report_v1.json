@@ -1,0 +1,283 @@
+{
+  "dataset": "tests\\fixtures\\gold_cases_v1.json",
+  "total": 20,
+  "metrics": {
+    "stage_accuracy": 0.05,
+    "intent_accuracy": 0.15,
+    "weak_point_accuracy": 0.05
+  },
+  "counts": {
+    "stage_hits": 1,
+    "intent_hits": 3,
+    "weak_point_hits": 1,
+    "failed_cases": 19
+  },
+  "failures": [
+    {
+      "id": "G001",
+      "user_text": "努力一定会成功。",
+      "expected": {
+        "stage": "S4",
+        "intent": "counterexample",
+        "weak_point": "counterexample"
+      },
+      "actual": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      }
+    },
+    {
+      "id": "G002",
+      "user_text": "有钱就会幸福。",
+      "expected": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      },
+      "actual": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      }
+    },
+    {
+      "id": "G003",
+      "user_text": "学校应该禁止学生带手机，因为手机会影响学习。",
+      "expected": {
+        "stage": "S3",
+        "intent": "necessary_vs_sufficient",
+        "weak_point": "logic_link"
+      },
+      "actual": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      }
+    },
+    {
+      "id": "G004",
+      "user_text": "我认为朋友就该无条件帮忙，不帮就不算朋友。",
+      "expected": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      },
+      "actual": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      }
+    },
+    {
+      "id": "G005",
+      "user_text": "我之前觉得分数不重要，但现在又觉得分数决定未来。",
+      "expected": {
+        "stage": "S3",
+        "intent": "test_consistency",
+        "weak_point": "consistency"
+      },
+      "actual": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      }
+    },
+    {
+      "id": "G006",
+      "user_text": "我最近很迷茫，不知道怎么办。",
+      "expected": {
+        "stage": "S0",
+        "intent": "clarify_term",
+        "weak_point": "claim"
+      },
+      "actual": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      }
+    },
+    {
+      "id": "G008",
+      "user_text": "我觉得早起好，因为早起能多出两个小时学习。",
+      "expected": {
+        "stage": "S3",
+        "intent": "probe_causality",
+        "weak_point": "causality"
+      },
+      "actual": {
+        "stage": "S0",
+        "intent": "clarify_term",
+        "weak_point": "claim"
+      }
+    },
+    {
+      "id": "G009",
+      "user_text": "所有网课都不如线下课。",
+      "expected": {
+        "stage": "S4",
+        "intent": "counterexample",
+        "weak_point": "counterexample"
+      },
+      "actual": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      }
+    },
+    {
+      "id": "G010",
+      "user_text": "只要自律，就一定能考上理想大学。",
+      "expected": {
+        "stage": "S3",
+        "intent": "necessary_vs_sufficient",
+        "weak_point": "logic_link"
+      },
+      "actual": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      }
+    },
+    {
+      "id": "G011",
+      "user_text": "我支持校服，因为这样更公平。",
+      "expected": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      },
+      "actual": {
+        "stage": "S0",
+        "intent": "clarify_term",
+        "weak_point": "claim"
+      }
+    },
+    {
+      "id": "G012",
+      "user_text": "既然很多成功人士都辍学了，那读书没意义。",
+      "expected": {
+        "stage": "S3",
+        "intent": "necessary_vs_sufficient",
+        "weak_point": "logic_link"
+      },
+      "actual": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      }
+    },
+    {
+      "id": "G013",
+      "user_text": "我相信AI会取代所有老师。",
+      "expected": {
+        "stage": "S4",
+        "intent": "counterexample",
+        "weak_point": "counterexample"
+      },
+      "actual": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      }
+    },
+    {
+      "id": "G014",
+      "user_text": "我应该选稳定工作，因为家里需要我尽快挣钱。",
+      "expected": {
+        "stage": "S5",
+        "intent": "operationalize",
+        "weak_point": "actionability"
+      },
+      "actual": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      }
+    },
+    {
+      "id": "G015",
+      "user_text": "我不想卷，但我又希望在竞争里赢。",
+      "expected": {
+        "stage": "S3",
+        "intent": "test_consistency",
+        "weak_point": "consistency"
+      },
+      "actual": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      }
+    },
+    {
+      "id": "G016",
+      "user_text": "我觉得健康很重要。",
+      "expected": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      },
+      "actual": {
+        "stage": "S1",
+        "intent": "clarify_term",
+        "weak_point": "definition"
+      }
+    },
+    {
+      "id": "G017",
+      "user_text": "我认为恋爱会影响学习，所以高中不该谈恋爱。",
+      "expected": {
+        "stage": "S3",
+        "intent": "probe_causality",
+        "weak_point": "causality"
+      },
+      "actual": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      }
+    },
+    {
+      "id": "G018",
+      "user_text": "如果一个规则能提高效率，那它就是好规则。",
+      "expected": {
+        "stage": "S3",
+        "intent": "value_priority",
+        "weak_point": "value"
+      },
+      "actual": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      }
+    },
+    {
+      "id": "G019",
+      "user_text": "我支持熬夜学习，因为这周确实提高了分数。",
+      "expected": {
+        "stage": "S4",
+        "intent": "counterexample",
+        "weak_point": "counterexample"
+      },
+      "actual": {
+        "stage": "S0",
+        "intent": "clarify_term",
+        "weak_point": "claim"
+      }
+    },
+    {
+      "id": "G020",
+      "user_text": "我现在的观点是：先保证睡眠，再谈成绩；今晚开始11点前睡。",
+      "expected": {
+        "stage": "S5",
+        "intent": "operationalize",
+        "weak_point": "actionability"
+      },
+      "actual": {
+        "stage": "S2",
+        "intent": "ask_premise",
+        "weak_point": "premise"
+      }
+    }
+  ]
+}

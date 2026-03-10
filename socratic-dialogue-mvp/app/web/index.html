@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Socratic Dialogue</title>
+  <style>
+    :root {
+      --bg: linear-gradient(160deg, #f6f7fb 0%, #e9eef8 100%);
+      --panel: #ffffff;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --accent: #0f766e;
+      --accent-soft: #ccfbf1;
+      --border: #dbe3ef;
+      --user: #e0f2fe;
+      --bot: #ecfeff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+    .app {
+      width: min(980px, 100%);
+      height: min(88vh, 860px);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      box-shadow: 0 18px 45px rgba(31, 41, 55, 0.12);
+    }
+    .top {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%);
+    }
+    .title { font-weight: 700; letter-spacing: 0.2px; }
+    .meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .pill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: #fff;
+    }
+    .pill strong { color: var(--accent); }
+    .chat {
+      padding: 16px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background:
+        radial-gradient(circle at 95% 5%, #dbeafe 0%, transparent 35%),
+        radial-gradient(circle at 10% 95%, #ccfbf1 0%, transparent 30%);
+    }
+    .msg {
+      max-width: 78%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      line-height: 1.5;
+      animation: fadeIn .22s ease;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .user { align-self: flex-end; background: var(--user); }
+    .assistant { align-self: flex-start; background: var(--bot); }
+    .sys {
+      align-self: center;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      border-radius: 10px;
+      padding: 6px 10px;
+      border: 1px dashed var(--border);
+    }
+    .composer {
+      border-top: 1px solid var(--border);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      background: #fff;
+    }
+    textarea {
+      resize: none;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      min-height: 54px;
+      max-height: 140px;
+      font: inherit;
+      outline: none;
+    }
+    textarea:focus { border-color: #94a3b8; }
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 0 16px;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 700px) {
+      .app { height: 92vh; border-radius: 14px; }
+      .msg { max-width: 92%; }
+      .top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <div class="title">Socratic Dialogue Web</div>
+      <div class="meta">
+        <span class="pill">Session: <strong id="session">-</strong></span>
+        <span class="pill">Stage: <strong id="stage">S0</strong></span>
+        <span class="pill">Intent: <strong id="intent">-</strong></span>
+        <span class="pill">Conf: <strong id="conf">-</strong></span>
+      </div>
+    </header>
+
+    <section id="chat" class="chat"></section>
+
+    <footer class="composer">
+      <textarea id="input" placeholder="输入你的观点，按 Ctrl+Enter 发送..."></textarea>
+      <button id="send">发送</button>
+    </footer>
+  </main>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const stageEl = document.getElementById('stage');
+    const intentEl = document.getElementById('intent');
+    const confEl = document.getElementById('conf');
+    const sessionEl = document.getElementById('session');
+
+    let sessionId = null;
+    let turnN = 0;
+
+    function addMsg(role, text) {
+      const div = document.createElement('div');
+      div.className = role === 'user' ? 'msg user' : role === 'assistant' ? 'msg assistant' : 'sys';
+      div.textContent = text;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    async function ensureSession() {
+      if (sessionId) return sessionId;
+      const res = await fetch('/api/v1/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: 'web_user', title: 'web-chat' })
+      });
+      if (!res.ok) throw new Error('创建会话失败');
+      const data = await res.json();
+      sessionId = data.session_id;
+      stageEl.textContent = data.current_stage;
+      sessionEl.textContent = sessionId.slice(0, 8) + '...';
+      addMsg('sys', '会话已创建，可以开始对话。');
+      return sessionId;
+    }
+
+    async function send() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+      sendBtn.disabled = true;
+      inputEl.disabled = true;
+      turnN += 1;
+
+      try {
+        const sid = await ensureSession();
+        addMsg('user', text);
+        inputEl.value = '';
+
+        const res = await fetch('/api/v1/chat/turn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: sid,
+            user_text: text,
+            client_turn_id: 'web-' + turnN
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          addMsg('sys', '请求失败: ' + err);
+          return;
+        }
+
+        const data = await res.json();
+        addMsg('assistant', data.assistant_text);
+        stageEl.textContent = data.current_stage;
+        intentEl.textContent = data.question_intent;
+        confEl.textContent = String(Number(data.confidence).toFixed(2));
+
+        if (data.summary_required) {
+          addMsg('sys', '系统建议：本轮可触发摘要确认。');
+        }
+      } catch (e) {
+        addMsg('sys', '错误: ' + (e.message || e));
+      } finally {
+        sendBtn.disabled = false;
+        inputEl.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        send();
+      }
+    });
+
+    addMsg('sys', '欢迎。输入你的观点，系统会进行苏格拉底式追问。');
+  </script>
+</body>
+</html>
