@@ -7,14 +7,17 @@ from sqlalchemy import select
 
 from .config import settings
 from .database import Base, engine, get_db
-from .models import User, Session as ChatSession, Turn, ArgumentUnit, StateTransition, QuestionPlan, Summary, Metric
-from .schemas import CreateSessionRequest, SessionResponse, ChatTurnRequest, ChatTurnResponse, SummaryConfirmRequest
+from .models import User, Session as ChatSession, Turn, ArgumentUnit, StateTransition, QuestionPlan, Summary, Metric, Document, DocumentChunk
+from .schemas import CreateSessionRequest, SessionResponse, ChatTurnRequest, ChatTurnResponse, SummaryConfirmRequest, CreateDocumentRequest, DocumentResponse, DocumentChunkResponse
 from .services.extractor import extract_structure
 from .services.state_machine import decide_next
-from .services.questioning import draft_question, light_rewrite
+from .services.retrieval import build_planning_rag
+from .services.questioning import generate_response
+from .services.documents import persist_document
 
 app = FastAPI(title=settings.app_name)
 WEB_INDEX = Path(__file__).parent / "web" / "index.html"
+DEV_INDEX = Path(__file__).parent / "web" / "dev.html"
 
 
 @app.on_event("startup")
@@ -29,6 +32,13 @@ def web_home():
     raise HTTPException(status_code=404, detail="WEB_UI_NOT_FOUND")
 
 
+@app.get("/dev")
+def web_dev():
+    if DEV_INDEX.exists():
+        return FileResponse(DEV_INDEX)
+    raise HTTPException(status_code=404, detail="DEV_UI_NOT_FOUND")
+
+
 @app.get("/api/v1/debug/config")
 def debug_config():
     return {
@@ -36,6 +46,10 @@ def debug_config():
         "llm_api_key_loaded": bool(settings.llm_api_key),
         "llm_base_url": settings.llm_base_url,
         "llm_model": settings.llm_model,
+        "generation_mode": settings.generation_mode,
+        "generation_model": settings.generation_model,
+        "planner_mode": settings.planner_mode,
+        "planner_model": settings.planner_model,
     }
 
 
@@ -67,6 +81,124 @@ def get_session(session_id: str, db: Session = Depends(get_db)):
     return SessionResponse(session_id=session.id, current_stage=session.current_stage, status=session.status)
 
 
+@app.get("/api/v1/sessions/{session_id}/debug-snapshot")
+def get_debug_snapshot(session_id: str, db: Session = Depends(get_db)):
+    session = db.get(ChatSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="SESSION_NOT_FOUND")
+
+    turns = (
+        db.query(Turn)
+        .filter(Turn.session_id == session_id)
+        .order_by(Turn.turn_index.desc())
+        .limit(12)
+        .all()
+    )
+    latest_argument = (
+        db.query(ArgumentUnit)
+        .filter(ArgumentUnit.session_id == session_id)
+        .order_by(ArgumentUnit.created_at.desc())
+        .first()
+    )
+    latest_transition = (
+        db.query(StateTransition)
+        .filter(StateTransition.session_id == session_id)
+        .order_by(StateTransition.created_at.desc())
+        .first()
+    )
+    latest_plan = (
+        db.query(QuestionPlan)
+        .filter(QuestionPlan.session_id == session_id)
+        .order_by(QuestionPlan.created_at.desc())
+        .first()
+    )
+    latest_summary = (
+        db.query(Summary)
+        .filter(Summary.session_id == session_id)
+        .order_by(Summary.created_at.desc())
+        .first()
+    )
+    metric = db.scalar(select(Metric).where(Metric.session_id == session_id))
+    documents = (
+        db.query(Document)
+        .filter(Document.session_id == session_id)
+        .order_by(Document.created_at.desc())
+        .limit(6)
+        .all()
+    )
+
+    return {
+        "session": {
+            "id": session.id,
+            "status": session.status,
+            "current_stage": session.current_stage,
+            "title": session.title,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+        },
+        "latest_argument_unit": None if not latest_argument else {
+            "id": latest_argument.id,
+            "turn_id": latest_argument.turn_id,
+            "claim": latest_argument.claim,
+            "reasons": latest_argument.reasons,
+            "evidence": latest_argument.evidence,
+            "value_premises": latest_argument.value_premises,
+            "definitions": latest_argument.definitions,
+            "flags": latest_argument.flags,
+            "confidence": latest_argument.confidence,
+            "raw_schema": latest_argument.raw_schema,
+            "created_at": latest_argument.created_at,
+        },
+        "latest_transition": None if not latest_transition else {
+            "from_stage": latest_transition.from_stage,
+            "to_stage": latest_transition.to_stage,
+            "trigger_type": latest_transition.trigger_type,
+            "trigger_detail": latest_transition.trigger_detail,
+            "at_turn_index": latest_transition.at_turn_index,
+            "created_at": latest_transition.created_at,
+        },
+        "latest_question_plan": None if not latest_plan else {
+            "current_stage": latest_plan.current_stage,
+            "weak_point": latest_plan.weak_point,
+            "question_intent": latest_plan.question_intent,
+            "constraints": latest_plan.constraints,
+            "created_at": latest_plan.created_at,
+        },
+        "latest_summary": None if not latest_summary else {
+            "round_range": latest_summary.round_range,
+            "summary_text": latest_summary.summary_text,
+            "user_confirmed": latest_summary.user_confirmed,
+            "created_at": latest_summary.created_at,
+        },
+        "documents": [
+            {
+                "id": document.id,
+                "title": document.title,
+                "source_type": document.source_type,
+                "chunk_count": db.query(DocumentChunk).filter(DocumentChunk.document_id == document.id).count(),
+                "created_at": document.created_at,
+            }
+            for document in documents
+        ],
+        "metrics": {
+            "consistency_score": 0.0 if not metric else metric.consistency_score,
+            "self_revision_count": 0 if not metric else metric.self_revision_count,
+            "question_repeat_rate": 0.0 if not metric else metric.question_repeat_rate,
+            "premise_explicit_count": 0 if not metric else metric.premise_explicit_count,
+        },
+        "recent_turns": [
+            {
+                "turn_index": turn.turn_index,
+                "role": turn.role,
+                "content": turn.content,
+                "question_intent": turn.question_intent,
+                "created_at": turn.created_at,
+            }
+            for turn in reversed(turns)
+        ],
+    }
+
+
 @app.post("/api/v1/sessions/{session_id}/close", response_model=SessionResponse)
 def close_session(session_id: str, db: Session = Depends(get_db)):
     session = db.get(ChatSession, session_id)
@@ -75,6 +207,67 @@ def close_session(session_id: str, db: Session = Depends(get_db)):
     session.status = "closed"
     db.commit()
     return SessionResponse(session_id=session.id, current_stage=session.current_stage, status=session.status)
+
+
+@app.post("/api/v1/sessions/{session_id}/documents", response_model=DocumentResponse)
+def create_document(session_id: str, payload: CreateDocumentRequest, db: Session = Depends(get_db)):
+    session = db.get(ChatSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="SESSION_NOT_FOUND")
+
+    document, chunks = persist_document(session_id=session_id, title=payload.title, content=payload.content)
+    db.add(document)
+    db.flush()
+    persisted_chunks: list[DocumentChunk] = []
+    for chunk in chunks:
+        chunk.document_id = document.id
+        db.add(chunk)
+        persisted_chunks.append(chunk)
+    db.commit()
+
+    return DocumentResponse(
+        document_id=document.id,
+        session_id=session_id,
+        title=document.title,
+        chunk_count=len(persisted_chunks),
+        source_type=document.source_type,
+    )
+
+
+@app.get("/api/v1/sessions/{session_id}/documents")
+def get_documents(session_id: str, db: Session = Depends(get_db)):
+    session = db.get(ChatSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="SESSION_NOT_FOUND")
+    docs = db.query(Document).filter(Document.session_id == session_id).order_by(Document.created_at.desc()).all()
+    return [
+        {
+            "document_id": document.id,
+            "session_id": session_id,
+            "title": document.title,
+            "source_type": document.source_type,
+            "chunk_count": db.query(DocumentChunk).filter(DocumentChunk.document_id == document.id).count(),
+            "created_at": document.created_at,
+        }
+        for document in docs
+    ]
+
+
+@app.get("/api/v1/documents/{document_id}/chunks")
+def get_document_chunks(document_id: str, db: Session = Depends(get_db)):
+    document = db.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="DOCUMENT_NOT_FOUND")
+    chunks = db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).order_by(DocumentChunk.chunk_index.asc()).all()
+    return [
+        {
+            "chunk_id": chunk.id,
+            "document_id": document_id,
+            "chunk_index": chunk.chunk_index,
+            "content": chunk.content,
+        }
+        for chunk in chunks
+    ]
 
 
 @app.post("/api/v1/chat/turn", response_model=ChatTurnResponse)
@@ -140,9 +333,17 @@ def chat_turn(payload: ChatTurnRequest, db: Session = Depends(get_db)):
     )
     turns_since_summary = (turn_count + 1) if not latest_summary else max(0, (turn_count + 1) - 4)
 
+    planning_rag = build_planning_rag(
+        db=db,
+        session_id=payload.session_id,
+        extraction=extracted,
+        exclude_turn_id=user_turn.id,
+    )
+
     decision = decide_next(
         current_stage=session.current_stage,
-        features=extracted.features,
+        extraction=extracted,
+        planning_rag=planning_rag,
         same_intent_recent=same_intent_recent,
         turns_since_summary=turns_since_summary,
         summary_interval=settings.summary_interval,
@@ -156,16 +357,23 @@ def chat_turn(payload: ChatTurnRequest, db: Session = Depends(get_db)):
         trigger_detail={
             "weak_point": decision.weak_point,
             "confidence": extracted.confidence,
+            "target_node": decision.target_node,
+            "target_text": decision.target_text,
+            "goal": decision.goal,
+            "planner_source": decision.planner_source,
+            "retrieval_summary": planning_rag.relevance_summary,
         },
         at_turn_index=user_turn.turn_index,
     )
     db.add(transition)
 
+    generation = generate_response(decision, extracted)
+
     assistant_turn = Turn(
         session_id=payload.session_id,
         turn_index=user_turn.turn_index + 1,
         role="assistant",
-        content=light_rewrite(draft_question(decision, extracted.claim), decision.safety_mode),
+        content=generation.text,
         question_intent=decision.question_intent,
     )
     db.add(assistant_turn)
@@ -177,7 +385,23 @@ def chat_turn(payload: ChatTurnRequest, db: Session = Depends(get_db)):
         current_stage=decision.to_stage,
         weak_point=decision.weak_point,
         question_intent=decision.question_intent,
-        constraints={"single_question": True, "max_sentences": 2},
+        constraints={
+            "single_question": True,
+            "max_sentences": 2,
+            "dialogue_act": decision.dialogue_act,
+            "target_node": decision.target_node,
+            "target_text": decision.target_text,
+            "target_reason": decision.target_reason,
+            "goal": decision.goal,
+            "follow_up_chain": decision.follow_up_chain,
+            "safety_mode": decision.safety_mode,
+            "planner_source": decision.planner_source,
+            "planner_error": decision.planner_error,
+            "selected_evidence": decision.selected_evidence,
+            "retrieval_summary": planning_rag.relevance_summary,
+            "generation_source": generation.source,
+            "generation_error": generation.error,
+        },
     )
     db.add(qplan)
 
@@ -217,8 +441,20 @@ def chat_turn(payload: ChatTurnRequest, db: Session = Depends(get_db)):
             },
             "weak_point": decision.weak_point,
             "safety_mode": decision.safety_mode,
+            "dialogue_act": decision.dialogue_act,
+            "target_node": decision.target_node,
+            "target_text": decision.target_text,
+            "target_reason": decision.target_reason,
+            "goal": decision.goal,
+            "follow_up_chain": decision.follow_up_chain,
+            "selected_evidence": decision.selected_evidence,
+            "planner_source": decision.planner_source,
+            "planner_error": decision.planner_error,
+            "retrieval_summary": planning_rag.relevance_summary,
             "extractor_source": extracted.raw_schema.get("_meta", {}).get("source"),
             "extractor_error": extracted.raw_schema.get("_meta", {}).get("error"),
+            "generation_source": generation.source,
+            "generation_error": generation.error,
         },
     )
 

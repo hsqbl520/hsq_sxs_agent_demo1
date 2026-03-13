@@ -53,3 +53,23 @@ class ChatTurnResponse(BaseModel):
 class SummaryConfirmRequest(BaseModel):
     confirmed: bool
     feedback: Optional[str] = None
+
+
+class CreateDocumentRequest(BaseModel):
+    title: Optional[str] = None
+    content: str = Field(min_length=1, max_length=50000)
+
+
+class DocumentResponse(BaseModel):
+    document_id: str
+    session_id: str
+    title: str
+    chunk_count: int
+    source_type: str
+
+
+class DocumentChunkResponse(BaseModel):
+    chunk_id: str
+    document_id: str
+    chunk_index: int
+    content: str

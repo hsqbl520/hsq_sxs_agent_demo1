@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Socratic Dev Console</title>
+  <style>
+    :root {
+      --bg: linear-gradient(145deg, #f3efe6 0%, #d9e7f4 52%, #f7f3ed 100%);
+      --panel: rgba(255, 255, 255, 0.88);
+      --ink: #18212b;
+      --muted: #5f6b78;
+      --accent: #a53f2b;
+      --accent-2: #0d6b6b;
+      --border: rgba(24, 33, 43, 0.12);
+      --shadow: 0 18px 50px rgba(24, 33, 43, 0.12);
+      --code: #0f1720;
+      --code-ink: #d7e0ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 14%, rgba(165, 63, 43, 0.12), transparent 20%),
+        radial-gradient(circle at 82% 18%, rgba(13, 107, 107, 0.12), transparent 22%),
+        var(--bg);
+    }
+    .shell {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 28px 20px 36px;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .hero-card,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+    }
+    .hero-card {
+      padding: 22px 24px;
+    }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1;
+      font-weight: 700;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .badge-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 16px;
+    }
+    .badge {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+    .badge span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .badge strong {
+      font-size: 15px;
+      color: var(--accent-2);
+      word-break: break-word;
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .toolbar .panel {
+      padding: 14px;
+    }
+    .toolbar input,
+    .toolbar button,
+    textarea {
+      font: inherit;
+    }
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--ink);
+      outline: none;
+    }
+    input:focus,
+    textarea:focus {
+      border-color: rgba(165, 63, 43, 0.4);
+      box-shadow: 0 0 0 3px rgba(165, 63, 43, 0.08);
+    }
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 16px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), #cb6848);
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    button.alt {
+      background: linear-gradient(135deg, var(--accent-2), #209090);
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+    .panel {
+      padding: 16px;
+      overflow: hidden;
+    }
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .panel-title {
+      font-size: 18px;
+      margin: 0;
+    }
+    .panel-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .chat {
+      display: grid;
+      gap: 10px;
+      max-height: 520px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .bubble {
+      border-radius: 16px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      animation: rise .2s ease;
+    }
+    .bubble.user { background: #eef6ff; }
+    .bubble.assistant { background: #f4fdf9; }
+    .bubble.system { background: #fffaf1; }
+    .composer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    textarea {
+      min-height: 84px;
+      resize: vertical;
+    }
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .fact {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.66);
+    }
+    .fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 5px;
+    }
+    .fact strong {
+      color: var(--accent-2);
+      font-size: 14px;
+      word-break: break-word;
+    }
+    pre {
+      margin: 0;
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--code);
+      color: var(--code-ink);
+      overflow: auto;
+      max-height: 320px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .status-line {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 1024px) {
+      .hero,
+      .grid,
+      .split,
+      .toolbar,
+      .facts,
+      .badge-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Developer Console</div>
+        <h1>Socratic Debug Surface</h1>
+        <p>这个页面直接展示当前会话的结构化抽取、状态机迁移、提问计划和本轮响应。你只需要在这里发消息，不需要再去 <code>/docs</code> 手工调接口。</p>
+      </div>
+      <div class="hero-card">
+        <div class="badge-grid">
+          <div class="badge"><span>Session</span><strong id="badgeSession">未创建</strong></div>
+          <div class="badge"><span>Stage</span><strong id="badgeStage">S0</strong></div>
+          <div class="badge"><span>Extractor</span><strong id="badgeExtractor">-</strong></div>
+          <div class="badge"><span>Extractor Model</span><strong id="badgeModel">-</strong></div>
+          <div class="badge"><span>Generator Model</span><strong id="badgeGenModel">-</strong></div>
+          <div class="badge"><span>Planner Model</span><strong id="badgePlannerModel">-</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="toolbar">
+      <div class="panel">
+        <div class="panel-sub">调试会话名</div>
+        <input id="titleInput" value="dev-console" />
+      </div>
+      <button id="createBtn" class="alt">新建会话</button>
+      <div class="panel status-line" id="statusLine">尚未创建会话。</div>
+      <button id="refreshBtn">刷新快照</button>
+    </section>
+
+    <section class="grid">
+      <div class="stack">
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Live Chat</h2>
+            <div class="panel-sub">直接测试一轮输入和系统追问</div>
+          </div>
+          <div id="chat" class="chat"></div>
+          <div class="composer">
+            <textarea id="messageInput" placeholder="输入你的观点，开发者页面会同时显示结构化抽取和状态机判断。"></textarea>
+            <button id="sendBtn">发送并分析</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Document RAG</h2>
+            <div class="panel-sub">粘贴一段资料，供当前会话检索</div>
+          </div>
+          <div class="composer">
+            <input id="docTitleInput" placeholder="资料标题，如 justice-note" />
+            <button id="addDocBtn" class="alt">导入资料</button>
+          </div>
+          <textarea id="docContentInput" placeholder="把文章、课堂材料或你的笔记直接粘贴到这里。"></textarea>
+          <pre id="docListJson">[]</pre>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Latest Response</h2>
+            <div class="panel-sub">本轮 chat/turn 的直接返回</div>
+          </div>
+          <div class="facts">
+            <div class="fact"><span>Current Stage</span><strong id="respStage">-</strong></div>
+            <div class="fact"><span>Dialogue Act</span><strong id="respDialogueAct">-</strong></div>
+            <div class="fact"><span>Question Intent</span><strong id="respIntent">-</strong></div>
+            <div class="fact"><span>Confidence</span><strong id="respConfidence">-</strong></div>
+            <div class="fact"><span>Summary Required</span><strong id="respSummary">-</strong></div>
+            <div class="fact"><span>Extractor Source</span><strong id="respExtractor">-</strong></div>
+            <div class="fact"><span>Generator Source</span><strong id="respGenerator">-</strong></div>
+            <div class="fact"><span>Planner Source</span><strong id="respPlanner">-</strong></div>
+            <div class="fact"><span>Extractor Error</span><strong id="respError">-</strong></div>
+            <div class="fact"><span>Generator Error</span><strong id="respGenError">-</strong></div>
+            <div class="fact"><span>Planner Error</span><strong id="respPlannerError">-</strong></div>
+            <div class="fact"><span>Target Node</span><strong id="respTargetNode">-</strong></div>
+            <div class="fact"><span>Target Text</span><strong id="respTargetText">-</strong></div>
+            <div class="fact"><span>Goal</span><strong id="respGoal">-</strong></div>
+          </div>
+          <pre id="respJson">{}</pre>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Debug Config</h2>
+            <div class="panel-sub">当前服务加载的模型配置</div>
+          </div>
+          <pre id="configJson">{}</pre>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">State Snapshot</h2>
+            <div class="panel-sub">当前会话整体状态</div>
+          </div>
+          <div class="facts">
+            <div class="fact"><span>Status</span><strong id="snapStatus">-</strong></div>
+            <div class="fact"><span>Session Stage</span><strong id="snapStage">-</strong></div>
+            <div class="fact"><span>Dialogue Act</span><strong id="snapDialogueAct">-</strong></div>
+            <div class="fact"><span>Weak Point</span><strong id="snapWeak">-</strong></div>
+            <div class="fact"><span>Transition</span><strong id="snapTransition">-</strong></div>
+            <div class="fact"><span>Focus Terms</span><strong id="snapFocusTerms">-</strong></div>
+            <div class="fact"><span>Attack Point</span><strong id="snapAttackPoint">-</strong></div>
+            <div class="fact"><span>Generation Source</span><strong id="snapGenerationSource">-</strong></div>
+            <div class="fact"><span>Top Retrieval Signal</span><strong id="snapTopSignal">-</strong></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Structured Extraction</h2>
+            <div class="panel-sub">DeepSeek 或回退规则抽取出的原始结构</div>
+          </div>
+          <pre id="rawSchema">{}</pre>
+        </div>
+
+        <div class="split">
+          <div class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">Question Plan</h2>
+              <div class="panel-sub">状态机决定的提问计划</div>
+            </div>
+            <pre id="planJson">{}</pre>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">Transition</h2>
+              <div class="panel-sub">最新状态迁移记录</div>
+            </div>
+            <pre id="transitionJson">{}</pre>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Metrics</h2>
+            <div class="panel-sub">当前会话累计指标</div>
+          </div>
+          <pre id="metricsJson">{}</pre>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const state = {
+      sessionId: null,
+      turnIndex: 0,
+    };
+
+    const els = {
+      titleInput: document.getElementById("titleInput"),
+      createBtn: document.getElementById("createBtn"),
+      refreshBtn: document.getElementById("refreshBtn"),
+      sendBtn: document.getElementById("sendBtn"),
+      docTitleInput: document.getElementById("docTitleInput"),
+      docContentInput: document.getElementById("docContentInput"),
+      addDocBtn: document.getElementById("addDocBtn"),
+      messageInput: document.getElementById("messageInput"),
+      chat: document.getElementById("chat"),
+      statusLine: document.getElementById("statusLine"),
+      badgeSession: document.getElementById("badgeSession"),
+      badgeStage: document.getElementById("badgeStage"),
+      badgeExtractor: document.getElementById("badgeExtractor"),
+      badgeModel: document.getElementById("badgeModel"),
+      badgeGenModel: document.getElementById("badgeGenModel"),
+      badgePlannerModel: document.getElementById("badgePlannerModel"),
+      respStage: document.getElementById("respStage"),
+      respDialogueAct: document.getElementById("respDialogueAct"),
+      respIntent: document.getElementById("respIntent"),
+      respConfidence: document.getElementById("respConfidence"),
+      respSummary: document.getElementById("respSummary"),
+      respExtractor: document.getElementById("respExtractor"),
+      respGenerator: document.getElementById("respGenerator"),
+      respPlanner: document.getElementById("respPlanner"),
+      respError: document.getElementById("respError"),
+      respGenError: document.getElementById("respGenError"),
+      respPlannerError: document.getElementById("respPlannerError"),
+      respTargetNode: document.getElementById("respTargetNode"),
+      respTargetText: document.getElementById("respTargetText"),
+      respGoal: document.getElementById("respGoal"),
+      respJson: document.getElementById("respJson"),
+      configJson: document.getElementById("configJson"),
+      snapStatus: document.getElementById("snapStatus"),
+      snapStage: document.getElementById("snapStage"),
+      snapDialogueAct: document.getElementById("snapDialogueAct"),
+      snapWeak: document.getElementById("snapWeak"),
+      snapTransition: document.getElementById("snapTransition"),
+      snapFocusTerms: document.getElementById("snapFocusTerms"),
+      snapAttackPoint: document.getElementById("snapAttackPoint"),
+      snapGenerationSource: document.getElementById("snapGenerationSource"),
+      snapTopSignal: document.getElementById("snapTopSignal"),
+      rawSchema: document.getElementById("rawSchema"),
+      planJson: document.getElementById("planJson"),
+      transitionJson: document.getElementById("transitionJson"),
+      metricsJson: document.getElementById("metricsJson"),
+      docListJson: document.getElementById("docListJson"),
+    };
+
+    function pretty(value) {
+      return JSON.stringify(value ?? {}, null, 2);
+    }
+
+    function addBubble(role, text) {
+      const div = document.createElement("div");
+      div.className = "bubble " + role;
+      div.textContent = text;
+      els.chat.appendChild(div);
+      els.chat.scrollTop = els.chat.scrollHeight;
+    }
+
+    async function getJson(url, options) {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || ("HTTP " + res.status));
+      }
+      return res.json();
+    }
+
+    async function loadConfig() {
+      const data = await getJson("/api/v1/debug/config");
+      els.configJson.textContent = pretty(data);
+      els.badgeExtractor.textContent = data.extractor_mode + " / " + (data.llm_api_key_loaded ? "key loaded" : "no key");
+      els.badgeModel.textContent = data.llm_model;
+      els.badgeGenModel.textContent = (data.generation_mode || "-") + " / " + (data.generation_model || "-");
+      els.badgePlannerModel.textContent = (data.planner_mode || "-") + " / " + (data.planner_model || "-");
+    }
+
+    async function createSession() {
+      const title = els.titleInput.value.trim() || "dev-console";
+      const data = await getJson("/api/v1/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: "dev_console_user", title })
+      });
+      state.sessionId = data.session_id;
+      state.turnIndex = 0;
+      els.badgeSession.textContent = data.session_id;
+      els.badgeStage.textContent = data.current_stage;
+      els.statusLine.textContent = "已创建开发会话，可以开始输入。";
+      els.chat.innerHTML = "";
+      addBubble("system", "新会话已创建。后续每次发送都会自动刷新结构化抽取和状态机快照。");
+      await refreshSnapshot();
+    }
+
+    async function refreshSnapshot() {
+      if (!state.sessionId) {
+        els.statusLine.textContent = "还没有 session，请先创建会话。";
+        return;
+      }
+
+      const snap = await getJson(`/api/v1/sessions/${state.sessionId}/debug-snapshot`);
+      els.badgeStage.textContent = snap.session.current_stage;
+      els.snapStatus.textContent = snap.session.status;
+      els.snapStage.textContent = snap.session.current_stage;
+      els.snapDialogueAct.textContent = snap.latest_question_plan ? (snap.latest_question_plan.constraints.dialogue_act || "-") : "-";
+      els.snapWeak.textContent = snap.latest_question_plan ? snap.latest_question_plan.weak_point : "-";
+      els.snapTransition.textContent = snap.latest_transition
+        ? `${snap.latest_transition.from_stage} -> ${snap.latest_transition.to_stage}`
+        : "-";
+      els.snapFocusTerms.textContent = snap.latest_argument_unit
+        ? (snap.latest_argument_unit.raw_schema.focus_terms || []).join(", ") || "-"
+        : "-";
+      els.snapAttackPoint.textContent = snap.latest_argument_unit
+        ? ((snap.latest_argument_unit.raw_schema.attackable_points || [])[0]?.type || "-")
+        : "-";
+      els.snapGenerationSource.textContent = snap.latest_question_plan
+        ? (snap.latest_question_plan.constraints.generation_source || "-")
+        : "-";
+      els.snapTopSignal.textContent = snap.latest_question_plan
+        ? (snap.latest_question_plan.constraints.retrieval_summary?.top_signal || "-")
+        : "-";
+      els.rawSchema.textContent = pretty(snap.latest_argument_unit ? snap.latest_argument_unit.raw_schema : {});
+      els.planJson.textContent = pretty(snap.latest_question_plan);
+      els.transitionJson.textContent = pretty(snap.latest_transition);
+      els.metricsJson.textContent = pretty(snap.metrics);
+      els.docListJson.textContent = pretty(snap.documents || []);
+    }
+
+
+    async function addDocument() {
+      if (!state.sessionId) {
+        await createSession();
+      }
+
+      const title = els.docTitleInput.value.trim() || "reference-note";
+      const content = els.docContentInput.value.trim();
+      if (!content) {
+        els.statusLine.textContent = "资料内容不能为空。";
+        return;
+      }
+
+      els.addDocBtn.disabled = true;
+      try {
+        const data = await getJson(`/api/v1/sessions/${state.sessionId}/documents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, content })
+        });
+        els.docContentInput.value = "";
+        els.statusLine.textContent = `资料已导入：${data.title}（${data.chunk_count} chunks）`;
+        await refreshSnapshot();
+      } catch (error) {
+        els.statusLine.textContent = "资料导入失败: " + (error.message || error);
+      } finally {
+        els.addDocBtn.disabled = false;
+      }
+    }
+
+    async function sendMessage() {
+      if (!state.sessionId) {
+        await createSession();
+      }
+
+      const text = els.messageInput.value.trim();
+      if (!text) return;
+
+      els.sendBtn.disabled = true;
+      state.turnIndex += 1;
+
+      try {
+        addBubble("user", text);
+        const data = await getJson("/api/v1/chat/turn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: state.sessionId,
+            user_text: text,
+            client_turn_id: "dev-" + state.turnIndex,
+            debug: true
+          })
+        });
+        addBubble("assistant", data.assistant_text);
+        els.messageInput.value = "";
+        els.respStage.textContent = data.current_stage;
+        els.respDialogueAct.textContent = data.meta.dialogue_act || "-";
+        els.respIntent.textContent = data.question_intent;
+        els.respConfidence.textContent = String(Number(data.confidence).toFixed(2));
+        els.respSummary.textContent = data.summary_required ? "true" : "false";
+        els.respExtractor.textContent = data.meta.extractor_source || "-";
+        els.respGenerator.textContent = data.meta.generation_source || "-";
+        els.respPlanner.textContent = data.meta.planner_source || "-";
+        els.respError.textContent = data.meta.extractor_error || "-";
+        els.respGenError.textContent = data.meta.generation_error || "-";
+        els.respPlannerError.textContent = data.meta.planner_error || "-";
+        els.respTargetNode.textContent = data.meta.target_node || "-";
+        els.respTargetText.textContent = data.meta.target_text || "-";
+        els.respGoal.textContent = data.meta.goal || "-";
+        els.respJson.textContent = pretty(data);
+        els.statusLine.textContent = "本轮请求完成，开发快照已刷新。";
+        await refreshSnapshot();
+      } catch (error) {
+        addBubble("system", "请求失败: " + (error.message || error));
+        els.statusLine.textContent = "请求失败，请看聊天区错误信息。";
+      } finally {
+        els.sendBtn.disabled = false;
+        els.messageInput.focus();
+      }
+    }
+
+    els.createBtn.addEventListener("click", createSession);
+    els.addDocBtn.addEventListener("click", addDocument);
+    els.refreshBtn.addEventListener("click", refreshSnapshot);
+    els.sendBtn.addEventListener("click", sendMessage);
+    els.messageInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+
+    loadConfig().catch((error) => {
+      els.statusLine.textContent = "加载配置失败: " + (error.message || error);
+    });
+  </script>
+</body>
+</html>

@@ -29,6 +29,7 @@ class Session(Base):
 
     user = relationship("User", back_populates="sessions")
     turns = relationship("Turn", back_populates="session")
+    documents = relationship("Document", back_populates="session")
 
 
 class Turn(Base):
@@ -110,3 +111,31 @@ class Metric(Base):
     self_revision_count: Mapped[int] = mapped_column(Integer, default=0)
     question_repeat_rate: Mapped[float] = mapped_column(Float, default=0.0)
     premise_explicit_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id"), index=True)
+    title: Mapped[str] = mapped_column(String)
+    source_type: Mapped[str] = mapped_column(String, default="pasted")
+    raw_content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    session = relationship("Session", back_populates="documents")
+    chunks = relationship("DocumentChunk", back_populates="document")
+
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id"), index=True)
+    document_id: Mapped[str] = mapped_column(String, ForeignKey("documents.id"), index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text)
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    document = relationship("Document", back_populates="chunks")

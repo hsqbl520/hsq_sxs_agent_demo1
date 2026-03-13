@@ -6,6 +6,7 @@ FastAPI backend for a Socratic questioning agent. This project includes:
 - rule-based judging
 - finite-state transitions (`S0`-`S5`)
 - question planning and light rewrite
+- pasted document RAG for session-specific references
 
 ## Project layout
 
@@ -14,6 +15,7 @@ socratic-dialogue-mvp/
 ├── app/               # FastAPI app and web UI
 ├── tests/             # API and evaluation tests
 ├── run.sh             # install deps and start server
+├── run_windows.bat    # Windows single-process startup
 ├── test.sh            # run pytest
 └── eval.sh            # run gold evaluation
 ```
@@ -63,6 +65,8 @@ Useful variables:
 - `LLM_API_KEY=...`
 - `LLM_BASE_URL=...`
 - `LLM_MODEL=...`
+- `PLANNER_MODE=llm|rule`
+- `PLANNER_MODEL=...`
 - `DATABASE_URL=sqlite:///./socratic.db` for local SQLite
 - `REDIS_URL=...` if runtime cache is needed
 
@@ -83,8 +87,25 @@ bash run.sh
 
 After startup:
 
-- chat UI: `http://127.0.0.1:8000/`
-- API docs: `http://127.0.0.1:8000/docs`
+- chat UI: `http://127.0.0.1:8010/`
+- developer UI: `http://127.0.0.1:8010/dev`
+- API docs: `http://127.0.0.1:8010/docs`
+
+### Recommended on Windows
+
+If you are running this project on Windows, prefer:
+
+```bat
+cd /d D:\colab\hsq_sxs_agent_demo1\socratic-dialogue-mvp
+run_windows.bat
+```
+
+This avoids the `WSL -> Windows Python -> uvicorn --reload` process chain and runs the server as a single Windows process.
+The default Windows port is `8010`. If that port is occupied, you can start on another port, for example:
+
+```bat
+run_windows.bat 8020
+```
 
 ## Common commands
 

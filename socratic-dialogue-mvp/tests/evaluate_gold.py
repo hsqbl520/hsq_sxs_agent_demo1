@@ -30,7 +30,7 @@ def evaluate(gold_path: Path) -> dict:
         extracted = extract_structure(text, history_texts=[])
         decision = decide_next(
             current_stage="S0",
-            features=extracted.features,
+            extraction=extracted,
             same_intent_recent=0,
             turns_since_summary=0,
             summary_interval=settings.summary_interval,
