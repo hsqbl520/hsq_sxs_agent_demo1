@@ -69,11 +69,16 @@ Useful variables:
 - `PLANNER_MODEL=...`
 - `DATABASE_URL=sqlite:///./socratic.db` for local SQLite
 - `REDIS_URL=...` if runtime cache is needed
+- `MEMORY_EMBEDDING_MODE=auto|openai|hash`
+- `MEMORY_EMBEDDING_MODEL=text-embedding-3-small`
+- `MEMORY_EMBEDDING_DIMENSIONS=256`
+- `MEMORY_EMBEDDING_TIMEOUT_SECONDS=3.0`
 
 If you do not want to call a real model during development, use:
 
 ```env
 EXTRACTOR_MODE=mock
+MEMORY_EMBEDDING_MODE=hash
 ```
 
 ## Run locally
@@ -90,6 +95,9 @@ After startup:
 - chat UI: `http://127.0.0.1:8010/`
 - developer UI: `http://127.0.0.1:8010/dev`
 - API docs: `http://127.0.0.1:8010/docs`
+- memory debug API: `GET /api/v1/sessions/{session_id}/memory/debug` (optional `query=...` for retrieval simulation)
+- memory flush preview: `GET /api/v1/sessions/{session_id}/memory/flush-preview`
+- memory profile diff: `GET /api/v1/sessions/{session_id}/memory/profile-diff`
 
 ### Recommended on Windows
 
@@ -128,6 +136,26 @@ bash eval.sh
 ```
 
 `run.sh` auto-loads `.env` if present.
+
+## Memory Retrieval V3
+
+The current retrieval layer is a hybrid memory system for planning:
+
+- writes turn memories and uploaded document chunks into SQLite session memory
+- promotes stable items into durable memory during pre-summary or session-close flush
+- compiles durable memory into a lightweight user profile for planner injection
+- maintains an FTS5 lexical index
+- stores per-record embeddings for semantic retrieval
+- merges BM25 and vector scores with temporal decay and MMR reranking
+- falls back to legacy rule retrieval if no memory candidates are available
+
+When `MEMORY_EMBEDDING_MODE=auto`, the app will try the configured embeddings endpoint first and fall back to a local hash embedding if the request fails.
+
+The memory debug surface now includes:
+
+- `GET /api/v1/sessions/{session_id}/memory/debug`: inspect session memory, durable memory, profile, and optional retrieval simulation
+- `GET /api/v1/sessions/{session_id}/memory/flush-preview`: see which session memories would be promoted and why
+- `GET /api/v1/sessions/{session_id}/memory/profile-diff`: inspect the profile delta if a flush happened now
 
 ## Collaboration notes
 

@@ -1,19 +1,21 @@
 from datetime import datetime
 from pathlib import Path
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from .config import settings
-from .database import Base, engine, get_db
-from .models import User, Session as ChatSession, Turn, ArgumentUnit, StateTransition, QuestionPlan, Summary, Metric, Document, DocumentChunk
+from .database import Base, engine, get_db, ensure_memory_fts, ensure_memory_schema
+from .models import User, Session as ChatSession, Turn, ArgumentUnit, StateTransition, QuestionPlan, Summary, Metric, Document, DocumentChunk, MemoryRecord, UserProfile
 from .schemas import CreateSessionRequest, SessionResponse, ChatTurnRequest, ChatTurnResponse, SummaryConfirmRequest, CreateDocumentRequest, DocumentResponse, DocumentChunkResponse
 from .services.extractor import extract_structure
 from .services.state_machine import decide_next
 from .services.retrieval import build_planning_rag
 from .services.questioning import generate_response
 from .services.documents import persist_document
+from .services.memory_store import capture_document_memories, capture_turn_memories
+from .services.memory_flush import build_flush_preview, flush_session_memory
 
 app = FastAPI(title=settings.app_name)
 WEB_INDEX = Path(__file__).parent / "web" / "index.html"
@@ -23,6 +25,8 @@ DEV_INDEX = Path(__file__).parent / "web" / "dev.html"
 @app.on_event("startup")
 def startup_event() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_memory_schema()
+    ensure_memory_fts()
 
 
 @app.get("/")
@@ -50,6 +54,9 @@ def debug_config():
         "generation_model": settings.generation_model,
         "planner_mode": settings.planner_mode,
         "planner_model": settings.planner_model,
+        "memory_embedding_mode": settings.memory_embedding_mode,
+        "memory_embedding_model": settings.memory_embedding_model,
+        "memory_embedding_dimensions": settings.memory_embedding_dimensions,
     }
 
 
@@ -61,6 +68,100 @@ def _get_or_create_user(db: Session, external_id: str) -> User:
     db.add(user)
     db.flush()
     return user
+
+
+def _serialize_memory_record(record: MemoryRecord, include_text: bool = False) -> dict:
+    payload = {
+        "id": record.id,
+        "scope": record.scope,
+        "status": record.status,
+        "source_type": record.source_type,
+        "source_id": record.source_id,
+        "kind": record.kind,
+        "term": record.term,
+        "profile_key": record.profile_key,
+        "origin_memory_id": record.origin_memory_id,
+        "score_hints": {
+            "importance": record.importance,
+            "confidence": record.confidence,
+            "stability": record.stability,
+        },
+        "is_evergreen": record.is_evergreen,
+        "embedding_source": record.embedding_source,
+        "created_at": record.created_at,
+        "last_confirmed_at": record.last_confirmed_at,
+        "promoted_at": record.promoted_at,
+        "meta": record.meta,
+    }
+    if include_text:
+        payload["text"] = record.text
+    return payload
+
+
+def _serialize_profile(profile: UserProfile | None) -> dict | None:
+    if not profile:
+        return None
+    return {
+        "dialogue_style": profile.dialogue_style,
+        "stable_definitions": profile.stable_definitions,
+        "value_hierarchy": profile.value_hierarchy,
+        "philosophical_tendency": profile.philosophical_tendency,
+        "long_term_goals": profile.long_term_goals,
+        "constraints": profile.constraints,
+        "updated_at": profile.updated_at,
+        "source_memory_ids": profile.source_memory_ids,
+    }
+
+
+def _normalize_profile_snapshot(snapshot: dict | None) -> dict | None:
+    if not snapshot:
+        return None
+    return {
+        "dialogue_style": snapshot.get("dialogue_style", "balanced_socratic"),
+        "stable_definitions": snapshot.get("stable_definitions") or {},
+        "value_hierarchy": snapshot.get("value_hierarchy") or [],
+        "philosophical_tendency": snapshot.get("philosophical_tendency") or [],
+        "long_term_goals": snapshot.get("long_term_goals") or [],
+        "constraints": snapshot.get("constraints") or [],
+        "source_memory_ids": snapshot.get("source_memory_ids") or [],
+        "updated_at": snapshot.get("updated_at"),
+    }
+
+
+def _serialize_flush_candidate(entry: dict) -> dict:
+    return {
+        **_serialize_memory_record(entry["record"], include_text=True),
+        "decision": entry["decision"],
+        "reason_code": entry["reason_code"],
+        "reason": entry["reason"],
+        "repeat_count": entry["repeat_count"],
+        "matched_durable_id": entry["matched_durable_id"],
+    }
+
+
+def _memory_debug_payload(db: Session, session: ChatSession, session_limit: int = 8, durable_limit: int = 8) -> dict:
+    session_memory_records = (
+        db.query(MemoryRecord)
+        .filter(MemoryRecord.session_id == session.id, MemoryRecord.scope == "session")
+        .order_by(MemoryRecord.created_at.desc())
+        .limit(session_limit)
+        .all()
+    )
+    durable_memory_records = (
+        db.query(MemoryRecord)
+        .filter(MemoryRecord.user_id == session.user_id, MemoryRecord.scope == "durable")
+        .order_by(MemoryRecord.created_at.desc())
+        .limit(durable_limit)
+        .all()
+    )
+    profile = db.query(UserProfile).filter(UserProfile.user_id == session.user_id).first()
+    return {
+        "session_record_count": db.query(MemoryRecord).filter(MemoryRecord.session_id == session.id, MemoryRecord.scope == "session").count(),
+        "durable_record_count": db.query(MemoryRecord).filter(MemoryRecord.user_id == session.user_id, MemoryRecord.scope == "durable").count(),
+        "recent_session_records": [_serialize_memory_record(record) for record in session_memory_records],
+        "recent_durable_records": [_serialize_memory_record(record, include_text=True) for record in durable_memory_records],
+        "profile": _serialize_profile(profile),
+    }
 
 
 @app.post("/api/v1/sessions", response_model=SessionResponse)
@@ -126,6 +227,7 @@ def get_debug_snapshot(session_id: str, db: Session = Depends(get_db)):
         .limit(6)
         .all()
     )
+    memory_payload = _memory_debug_payload(db, session)
 
     return {
         "session": {
@@ -186,6 +288,7 @@ def get_debug_snapshot(session_id: str, db: Session = Depends(get_db)):
             "question_repeat_rate": 0.0 if not metric else metric.question_repeat_rate,
             "premise_explicit_count": 0 if not metric else metric.premise_explicit_count,
         },
+        "memory": memory_payload,
         "recent_turns": [
             {
                 "turn_index": turn.turn_index,
@@ -199,11 +302,137 @@ def get_debug_snapshot(session_id: str, db: Session = Depends(get_db)):
     }
 
 
+@app.get("/api/v1/sessions/{session_id}/memory/debug")
+def get_memory_debug(
+    session_id: str,
+    query: str | None = Query(default=None, min_length=1, max_length=2000),
+    session_limit: int = Query(default=12, ge=1, le=50),
+    durable_limit: int = Query(default=12, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    session = db.get(ChatSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="SESSION_NOT_FOUND")
+
+    payload = {
+        "session": {
+            "id": session.id,
+            "status": session.status,
+            "current_stage": session.current_stage,
+            "title": session.title,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+        },
+        "memory": _memory_debug_payload(db, session, session_limit=session_limit, durable_limit=durable_limit),
+    }
+
+    if query:
+        history_turns = (
+            db.query(Turn)
+            .filter(Turn.session_id == session_id)
+            .order_by(Turn.turn_index.asc())
+            .all()
+        )
+        history_user_texts = [turn.content for turn in history_turns if turn.role == "user"]
+        extracted = extract_structure(query, history_user_texts)
+        planning_rag = build_planning_rag(
+            db=db,
+            session_id=session_id,
+            extraction=extracted,
+            exclude_turn_id=None,
+        )
+        payload["query_debug"] = {
+            "query": query,
+            "extraction": {
+                "claim": extracted.claim,
+                "reasons": extracted.reasons,
+                "definitions": extracted.definitions,
+                "value_premises": extracted.value_premises,
+                "focus_terms": extracted.focus_terms,
+                "attackable_points": extracted.attackable_points,
+                "missing_links": extracted.missing_links,
+                "flags": extracted.flags,
+                "confidence": extracted.confidence,
+                "extractor_source": extracted.raw_schema.get("_meta", {}).get("source"),
+                "extractor_error": extracted.raw_schema.get("_meta", {}).get("error"),
+            },
+            "retrieval_summary": planning_rag.relevance_summary,
+            "profile_snapshot": planning_rag.profile_snapshot,
+            "profile_hits": planning_rag.profile_hits,
+            "definition_hits": planning_rag.definition_hits,
+            "memory_conflicts": planning_rag.memory_conflicts,
+            "memory_supports": planning_rag.memory_supports,
+            "revision_hits": planning_rag.revision_hits,
+            "counterexample_hits": planning_rag.counterexample_hits,
+            "doc_hits": planning_rag.doc_hits,
+        }
+
+    return payload
+
+
+@app.get("/api/v1/sessions/{session_id}/memory/flush-preview")
+def get_memory_flush_preview(session_id: str, db: Session = Depends(get_db)):
+    session = db.get(ChatSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="SESSION_NOT_FOUND")
+
+    preview = build_flush_preview(db, session_id)
+    return {
+        "session": {
+            "id": session.id,
+            "status": session.status,
+            "current_stage": session.current_stage,
+            "title": session.title,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+        },
+        "flush_window": {
+            "lookback_turns": settings.memory_flush_lookback_turns,
+            "candidate_count": preview["candidate_count"],
+            "would_promote_count": preview["would_promote_count"],
+            "would_confirm_existing_count": preview["would_confirm_existing_count"],
+            "would_skip_count": preview["would_skip_count"],
+        },
+        "candidates": [_serialize_flush_candidate(entry) for entry in preview["candidates"]],
+        "profile_before": _normalize_profile_snapshot(preview["profile_before"]),
+        "profile_after": _normalize_profile_snapshot(preview["profile_after"]),
+        "profile_diff": preview["profile_diff"],
+    }
+
+
+@app.get("/api/v1/sessions/{session_id}/memory/profile-diff")
+def get_memory_profile_diff(session_id: str, db: Session = Depends(get_db)):
+    session = db.get(ChatSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="SESSION_NOT_FOUND")
+
+    preview = build_flush_preview(db, session_id)
+    return {
+        "session": {
+            "id": session.id,
+            "status": session.status,
+            "current_stage": session.current_stage,
+            "title": session.title,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+        },
+        "flush_window": {
+            "candidate_count": preview["candidate_count"],
+            "would_promote_count": preview["would_promote_count"],
+            "would_confirm_existing_count": preview["would_confirm_existing_count"],
+        },
+        "profile_before": _normalize_profile_snapshot(preview["profile_before"]),
+        "profile_after": _normalize_profile_snapshot(preview["profile_after"]),
+        "profile_diff": preview["profile_diff"],
+    }
+
+
 @app.post("/api/v1/sessions/{session_id}/close", response_model=SessionResponse)
 def close_session(session_id: str, db: Session = Depends(get_db)):
     session = db.get(ChatSession, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="SESSION_NOT_FOUND")
+    flush_session_memory(db, session_id=session_id)
     session.status = "closed"
     db.commit()
     return SessionResponse(session_id=session.id, current_stage=session.current_stage, status=session.status)
@@ -223,6 +452,8 @@ def create_document(session_id: str, payload: CreateDocumentRequest, db: Session
         chunk.document_id = document.id
         db.add(chunk)
         persisted_chunks.append(chunk)
+    db.flush()
+    capture_document_memories(db, session=session, document=document, document_chunks=persisted_chunks)
     db.commit()
 
     return DocumentResponse(
@@ -399,6 +630,8 @@ def chat_turn(payload: ChatTurnRequest, db: Session = Depends(get_db)):
             "planner_error": decision.planner_error,
             "selected_evidence": decision.selected_evidence,
             "retrieval_summary": planning_rag.relevance_summary,
+            "profile_snapshot": planning_rag.profile_snapshot,
+            "profile_hits": planning_rag.profile_hits,
             "generation_source": generation.source,
             "generation_error": generation.error,
         },
@@ -406,8 +639,11 @@ def chat_turn(payload: ChatTurnRequest, db: Session = Depends(get_db)):
     db.add(qplan)
 
     session.current_stage = decision.to_stage
+    captured_memories = capture_turn_memories(db, session=session, turn=user_turn, extraction=extracted, raw_text=payload.user_text)
+    flush_result = {"promoted_count": 0, "profile_updated": False, "dialogue_style": None}
 
     if decision.summary_required:
+        flush_result = flush_session_memory(db, session_id=payload.session_id)
         summary = Summary(
             session_id=payload.session_id,
             round_range=f"{max(1, user_turn.turn_index-3)}-{user_turn.turn_index}",
@@ -451,10 +687,15 @@ def chat_turn(payload: ChatTurnRequest, db: Session = Depends(get_db)):
             "planner_source": decision.planner_source,
             "planner_error": decision.planner_error,
             "retrieval_summary": planning_rag.relevance_summary,
+            "profile_snapshot": planning_rag.profile_snapshot,
+            "profile_hits": planning_rag.profile_hits,
             "extractor_source": extracted.raw_schema.get("_meta", {}).get("source"),
             "extractor_error": extracted.raw_schema.get("_meta", {}).get("error"),
             "generation_source": generation.source,
             "generation_error": generation.error,
+            "memory_records_captured": len(captured_memories),
+            "memory_flush": flush_result,
+            "profile_snapshot": planning_rag.profile_snapshot,
         },
     )
 

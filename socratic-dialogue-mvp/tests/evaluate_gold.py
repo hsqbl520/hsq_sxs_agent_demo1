@@ -10,6 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.config import settings
 from app.services.extractor import extract_structure
+from app.services.retrieval import PlanningRAG
 from app.services.state_machine import decide_next
 
 
@@ -31,6 +32,15 @@ def evaluate(gold_path: Path) -> dict:
         decision = decide_next(
             current_stage="S0",
             extraction=extracted,
+            planning_rag=PlanningRAG(
+                memory_conflicts=[],
+                memory_supports=[],
+                definition_hits=[],
+                counterexample_hits=[],
+                revision_hits=[],
+                doc_hits=[],
+                relevance_summary={},
+            ),
             same_intent_recent=0,
             turns_since_summary=0,
             summary_interval=settings.summary_interval,

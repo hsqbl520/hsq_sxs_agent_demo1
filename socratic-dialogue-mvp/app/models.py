@@ -139,3 +139,50 @@ class DocumentChunk(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     document = relationship("Document", back_populates="chunks")
+
+
+class MemoryRecord(Base):
+    __tablename__ = "memory_records"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id"), nullable=True, index=True)
+    session_id: Mapped[str | None] = mapped_column(String, ForeignKey("sessions.id"), nullable=True, index=True)
+    source_type: Mapped[str] = mapped_column(String, index=True)
+    source_id: Mapped[str] = mapped_column(String, index=True)
+    scope: Mapped[str] = mapped_column(String, default="session", index=True)
+    status: Mapped[str] = mapped_column(String, default="active", index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer, default=1)
+    kind: Mapped[str] = mapped_column(String, index=True)
+    term: Mapped[str | None] = mapped_column(String, nullable=True)
+    profile_key: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    origin_memory_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    text: Mapped[str] = mapped_column(Text)
+    search_text: Mapped[str] = mapped_column(Text)
+    importance: Mapped[float] = mapped_column(Float, default=0.5)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    stability: Mapped[float] = mapped_column(Float, default=0.5)
+    is_evergreen: Mapped[bool] = mapped_column(Boolean, default=False)
+    embedding: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    embedding_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    promoted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    access_count: Mapped[int] = mapped_column(Integer, default=0)
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), unique=True, index=True)
+    dialogue_style: Mapped[str] = mapped_column(String, default="balanced_socratic")
+    philosophical_tendency: Mapped[list] = mapped_column(JSON, default=list)
+    stable_definitions: Mapped[dict] = mapped_column(JSON, default=dict)
+    value_hierarchy: Mapped[list] = mapped_column(JSON, default=list)
+    long_term_goals: Mapped[list] = mapped_column(JSON, default=list)
+    constraints: Mapped[list] = mapped_column(JSON, default=list)
+    source_memory_ids: Mapped[list] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -259,6 +259,18 @@ def _rule_decide(
             hit = planning_rag.definition_hits[0]
             reason = f"你之前给过一个相关定义：{hit['text']}。现在这个词的边界又变得模糊了。"
             evidence = [hit]
+        else:
+            stable_definition = (planning_rag.profile_snapshot.get("stable_definitions") or {}).get(target_term)
+            if stable_definition:
+                reason = f"你的长期画像里对“{target_term}”有一个稳定定义：{stable_definition}。这一轮没有沿用它。"
+                evidence = [
+                    {
+                        "source": f"profile_definition:{target_term}",
+                        "text": stable_definition,
+                        "relation": "profile_definition",
+                        "score": 0.92,
+                    }
+                ]
         decision = _decision_from_point(
             "undefined_term",
             "focus_term[0]",
@@ -332,6 +344,10 @@ def _rule_decide(
         fallback.get("why", "这是当前论证里最薄弱的一环。"),
         same_intent_recent,
     )
+    if planning_rag.profile_snapshot.get("dialogue_style") == "direct_challenge" and decision.dialogue_act == "probe":
+        decision.dialogue_act = "challenge"
+    if planning_rag.profile_snapshot.get("dialogue_style") == "gentle_probe" and decision.dialogue_act == "challenge":
+        decision.dialogue_act = "probe"
     return decision
 
 

@@ -399,6 +399,31 @@
           </div>
           <pre id="metricsJson">{}</pre>
         </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Memory Debug</h2>
+            <div class="panel-sub">flush preview 和 profile diff 的开发视图</div>
+          </div>
+          <div class="facts">
+            <div class="fact"><span>Session Memory</span><strong id="memSessionCount">0</strong></div>
+            <div class="fact"><span>Durable Memory</span><strong id="memDurableCount">0</strong></div>
+            <div class="fact"><span>Would Promote</span><strong id="memWouldPromote">0</strong></div>
+            <div class="fact"><span>Would Confirm</span><strong id="memWouldConfirm">0</strong></div>
+            <div class="fact"><span>Profile Changes</span><strong id="memProfileChanges">0</strong></div>
+            <div class="fact"><span>After Style</span><strong id="memAfterStyle">-</strong></div>
+          </div>
+          <div class="split">
+            <div>
+              <div class="panel-sub" style="margin: 12px 0 8px;">Flush Preview</div>
+              <pre id="flushPreviewJson">{}</pre>
+            </div>
+            <div>
+              <div class="panel-sub" style="margin: 12px 0 8px;">Profile Diff</div>
+              <pre id="profileDiffJson">{}</pre>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -456,6 +481,14 @@
       transitionJson: document.getElementById("transitionJson"),
       metricsJson: document.getElementById("metricsJson"),
       docListJson: document.getElementById("docListJson"),
+      memSessionCount: document.getElementById("memSessionCount"),
+      memDurableCount: document.getElementById("memDurableCount"),
+      memWouldPromote: document.getElementById("memWouldPromote"),
+      memWouldConfirm: document.getElementById("memWouldConfirm"),
+      memProfileChanges: document.getElementById("memProfileChanges"),
+      memAfterStyle: document.getElementById("memAfterStyle"),
+      flushPreviewJson: document.getElementById("flushPreviewJson"),
+      profileDiffJson: document.getElementById("profileDiffJson"),
     };
 
     function pretty(value) {
@@ -512,6 +545,12 @@
       }
 
       const snap = await getJson(`/api/v1/sessions/${state.sessionId}/debug-snapshot`);
+      const memoryResults = await Promise.allSettled([
+        getJson(`/api/v1/sessions/${state.sessionId}/memory/flush-preview`),
+        getJson(`/api/v1/sessions/${state.sessionId}/memory/profile-diff`)
+      ]);
+      const flushPreview = memoryResults[0].status === "fulfilled" ? memoryResults[0].value : null;
+      const profileDiff = memoryResults[1].status === "fulfilled" ? memoryResults[1].value : null;
       els.badgeStage.textContent = snap.session.current_stage;
       els.snapStatus.textContent = snap.session.status;
       els.snapStage.textContent = snap.session.current_stage;
@@ -537,6 +576,18 @@
       els.transitionJson.textContent = pretty(snap.latest_transition);
       els.metricsJson.textContent = pretty(snap.metrics);
       els.docListJson.textContent = pretty(snap.documents || []);
+      els.memSessionCount.textContent = String(snap.memory?.session_record_count ?? 0);
+      els.memDurableCount.textContent = String(snap.memory?.durable_record_count ?? 0);
+      els.memWouldPromote.textContent = String(flushPreview?.flush_window?.would_promote_count ?? 0);
+      els.memWouldConfirm.textContent = String(flushPreview?.flush_window?.would_confirm_existing_count ?? 0);
+      els.memProfileChanges.textContent = String(profileDiff?.profile_diff?.changed_fields?.length ?? 0);
+      els.memAfterStyle.textContent = profileDiff?.profile_after?.dialogue_style || "-";
+      els.flushPreviewJson.textContent = flushPreview
+        ? pretty(flushPreview)
+        : pretty({ error: String(memoryResults[0].reason || "memory/flush-preview failed") });
+      els.profileDiffJson.textContent = profileDiff
+        ? pretty(profileDiff)
+        : pretty({ error: String(memoryResults[1].reason || "memory/profile-diff failed") });
     }
 
 
